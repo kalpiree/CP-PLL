@@ -1,0 +1,173 @@
+def get_shot_acc(self, preds, labels, acc_per_cls=False):
+        if self.test_class_count is None:
+            self.test_class_count = []
+            for l in range(self.num_class):
+                self.test_class_count.append(len(labels[labels == l]))
+
+        class_correct = []
+        for l in range(self.num_class):
+            class_correct.append((preds[labels == l] == labels[labels == l]).sum())
+
+        many_shot = []
+        median_shot = []
+        low_shot = []
+        for i in range(self.num_class):
+            if self.train_class_count[i] > self.many_shot_thr:
+                many_shot.append((class_correct[i] / float(self.test_class_count[i])))
+            elif self.train_class_count[i] < self.low_shot_thr:
+                low_shot.append((class_correct[i] / float(self.test_class_count[i])))
+            else:
+                median_shot.append((class_correct[i] / float(self.test_class_count[i])))
+
+        if len(many_shot) == 0:
+            many_shot.append(0)
+        if len(median_shot) == 0:
+            median_shot.append(0)
+        if len(low_shot) == 0:
+            low_shot.append(0)
+
+        if acc_per_cls:
+            class_accs = [c / cnt for c, cnt in zip(class_correct, self.test_class_count)] 
+            return np.mean(many_shot) * 100, np.mean(median_shot) * 100, np.mean(low_shot) * 100, class_accs
+        else:
+            return np.mean(many_shot) * 100, np.mean(median_shot) * 100, np.mean(low_shot) * 100
+
+
+
+
+def test(self, model, test_loader, type=1):
+        all_scores = []
+        all_labels = []
+        with torch.no_grad():
+            if type == 1:
+                print('==> Evaluation tail...')
+            elif type == 2:
+                print('==> Evaluation head...')
+            else:
+                print('==> Evaluation ensemble...')
+            model.eval()
+            pred_list = []
+            true_list = []
+            #for _, (images, labels) in enumerate(test_loader):
+            #for i, (images, labels) in enumerate(test_loader):
+            for i, batch in enumerate(test_loader):
+                print(f"Batch {i}: {len(batch)} elements")
+                if len(batch) == 2:
+                    images, labels = batch
+                else:
+                    print(f"Unexpected number of elements in batch {i}: {len(batch)}")
+                    continue  # Skip this batch or handle accordingly
+
+                images = images.cuda()
+                labels = labels.cuda()  # Ensure labels are on the correct device
+                #images = images.cuda()
+                if type == 1:
+                    _, outputs, _ = model(images)
+                    pred = F.softmax(outputs, dim=1)
+                elif type == 2:
+                    outputs, _, _ = model(images)
+                    pred = F.softmax(outputs, dim=1)
+                else:
+                    logit_head, logit_tail, _ = model(images)
+                    pred = model.ensemble(logit_head, logit_tail, self.loss_fn.get_distribution())
+
+                pred_list.append(pred.cpu())
+                true_list.append(labels)
+                all_scores.extend(pred.cpu().numpy())
+                all_labels.extend(labels.cpu().numpy())
+
+            
+
+            pred_list = torch.cat(pred_list, dim=0)
+            true_list = torch.cat(true_list, dim=0)
+
+            #pred_list = pred_list.cuda()  # Ensure pred_list is on the correct device
+            #true_list = true_list.cuda()  # Ensure true_list is on the correct device
+
+            pred_list_np = pred_list.numpy()  # Convert to NumPy array
+            true_list_np = true_list.numpy()  # Convert to NumPy array
+
+            acc1, acc5 = accuracy(pred_list, true_list, topk=(1, 5))
+            acc_many, acc_med, acc_few = self.acc_shot.get_shot_acc(pred_list_np.max(dim=1)[1], true_list_np)
+            print('==> Test Accuracy is %.2f%% (%.2f%%), [%.2f%%, %.2f%%, %.2f%%]' % (
+                acc1, acc5, acc_many, acc_med, acc_few))
+        return float(acc1), float(acc_many), float(acc_med), float(acc_few), all_scores, all_labels
+
+
+
+
+
+
+
+def __getitem__(self, index):
+        if self.train:
+            img, true = self.train_data[index],  self.train_labels[index]
+        elif self.validation:
+            img,  true = self.val_data[index],  self.val_labels[index]
+        else:
+            img, true = self.test_data[index],  self.test_labels[index]
+
+        img = Image.fromarray(img.numpy(), mode='RGB')
+
+        if self.transform is not None:
+            img = self.transform(img)
+
+        # if self.target_transform is not None:
+        #     target = self.target_transform(target)
+
+        return img, true
+
+
+for i, batch in enumerate(test_loader):
+                if len(batch) == 2:
+                    images, labels = batch
+                elif len(batch) == 3:
+                    images, labels, _ = batch  # Unpack the third element as '_'
+                else:
+                    print(f"Unexpected number of elements in batch {i}: {len(batch)}")
+                    continue
+                images = images.cuda()
+                if type == 1:
+                    _, outputs, _ = model(images)
+                    pred = F.softmax(outputs, dim=1)
+                elif type == 2:
+                    outputs, _, _ = model(images)
+                    pred = F.softmax(outputs, dim=1)
+                else:
+                    logit_head, logit_tail, _ = model(images)
+                    pred = model.ensemble(logit_head, logit_tail, self.loss_fn.get_distribution())
+
+                pred_list.append(pred.cpu())
+                true_list.append(labels)
+                all_scores.extend(pred.cpu().numpy())
+                all_labels.extend(labels.cpu().numpy())
+
+            pred_list = torch.cat(pred_list, dim=0)
+            true_list = torch.cat(true_list, dim=0)
+
+            pred_list = pred_list.max(dim=1)[1]
+
+             # Store the logits or probability outputs
+            output_list = []  # Add this line
+
+            # Inside the for loop, store the outputs
+            output_list.append(outputs.cpu())  # Add this line
+
+            # After the for loop, concatenate the output list
+            if output_list:  # Check if output_list is not empty
+                output_list = torch.cat(output_list, dim=0)
+            else:
+                print("output_list is empty.")
+                return 0, 0, 0, 0, all_scores, all_labels
+
+            # Use logits/probability outputs for accuracy calculation
+            acc1, acc5 = accuracy(output_list, true_list, topk=(1, 5))  # Change this line
+
+            # Use class indices for get_shot_acc calculation
+            acc_many, acc_med, acc_few = self.acc_shot.get_shot_acc(pred_list, true_list)  # Use class indices here               
+
+            #acc1, acc5 = accuracy(pred_list, true_list, topk=(1, 5))
+            #acc_many, acc_med, acc_few = self.acc_shot.get_shot_acc(pred_list.max(dim=1)[1], true_list)
+            print('==> Test Accuracy is %.2f%% (%.2f%%), [%.2f%%, %.2f%%, %.2f%%]' % (
+                acc1, acc5, acc_many, acc_med, acc_few))
+        return float(acc1), float(acc_many), float(acc_med), float(acc_few), all_scores, all_labels
