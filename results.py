@@ -1,8 +1,9 @@
-
 import os
 import numpy as np
 import pandas as pd
 import re
+import argparse
+
 
 def load_data(file_path):
     data = np.load(file_path, allow_pickle=True)
@@ -154,7 +155,18 @@ def process_datasets(base_path, epsilon, partial_rate=0.1):
     print(f"All results saved to '{output_file_path}'.")
 
 
-# Example usage
-base_path = '/Users/ct-pll/table_cifar_100_lt'
-epsilon = 0.1  # Example epsilon value
-process_datasets(base_path, epsilon)
+def main():
+    parser = argparse.ArgumentParser(description='Process datasets for CP-PLL algorithm.')
+    parser.add_argument('--base_path', type=str, required=True,
+                        help='Specify the base path containing the files to process.')
+    parser.add_argument('--epsilon', type=float, required=True, help='Specify the epsilon value for the algorithm.')
+    parser.add_argument('--partial_rate', type=float, default=0.1,
+                         help='Specify the partial rate for generating candidate labels.')
+
+    args = parser.parse_args()
+
+    process_datasets(args.base_path, args.epsilon, args.partial_rate)
+
+
+if __name__ == '__main__':
+    main()
